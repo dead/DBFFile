@@ -107,12 +107,16 @@ var openDBF = async (path: string): Promise<DBFFile> => {
         while (headerLength > 32 + fields.length * 32) {
             await (fs.readAsync(fd, buffer, 0, 32, 32 + fields.length * 32));
             if (buffer.readUInt8(0) === 0x0D) break;
+
+            var type = String.fromCharCode(buffer[0x0B]);
+
             var field = {
                 name: buffer.toString('utf8', 0, 10).split('\0')[0],
-                type: String.fromCharCode(buffer[0x0B]),
-                size: buffer.readUInt8(0x10),
-                decs: buffer.readUInt8(0x11)
+                type: type,
+                size: type === 'C' ? buffer.readInt16LE(0x10) : buffer.readUInt8(0x10),
+                decs: type === 'C' ? 0 : buffer.readUInt8(0x11)
             };
+            
             assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
             fields.push(field);
         }
@@ -183,8 +187,14 @@ var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
             }
             buffer.writeUInt8(type.charCodeAt(0), 0x0B);        // Field type
             buffer.writeUInt32LE(0, 0x0C);                      // Field data address (set to zero)
-            buffer.writeUInt8(size, 0x10);                      // Field length
-            buffer.writeUInt8(decs, 0x11);                      // Decimal count
+            
+            if (type !== 'C') {
+                buffer.writeUInt8(size, 0x10);                      // Field length
+                buffer.writeUInt8(decs, 0x11);                      // Decimal count
+            } else {
+                buffer.writeUInt16LE(size, 0x10);   
+            }
+            
             buffer.writeUInt16LE(0, 0x12);                      // Reserved (set to zero)
             buffer.writeUInt8(0x01, 0x14);                      // Work area ID (always 01h for dBase III)
             buffer.writeUInt16LE(0, 0x15);                      // Reserved (set to zero)
@@ -435,7 +445,7 @@ function validateFields(fields: Field[]): void {
         if (name.length > 10) throw new Error("Field name '" + name + "' is too long (maximum is 10 chars)");
         if (['C', 'N', 'L', 'D', 'I'].indexOf(type) === -1) throw new Error("Type '" + type + "' is not supported");
         if (size < 1) throw new Error('Field size is too small (minimum is 1)');
-        if (type === 'C' && size > 255) throw new Error('Field size is too large (maximum is 255)');
+        if (type === 'C' && size > 65535) throw new Error('Field size is too large (maximum is 65535)');
         if (type === 'N' && size > 20) throw new Error('Field size is too large (maximum is 20)');
         if (type === 'L' && size !== 1) throw new Error('Invalid field size (must be 1)');
         if (type === 'D' && size !== 8) throw new Error('Invalid field size (must be 8)');
