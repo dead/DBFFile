@@ -61,6 +61,10 @@ export class DBFFile {
         return readRecordsFromDBF(this, maxRows);
     }
 
+    updateRecord(RECNO: number, data: any) {
+        return updateRecordFromDBF(this, RECNO, data)
+    }
+
 
     // Private.
     _recordsRead: number;
@@ -229,7 +233,68 @@ var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
 };
 
 
+var updateRecordFromDBF = async (dbf: DBFFile, RECNO: number, data: any) => {
+    try {
+        var fd = await (fs.openAsync(dbf.path, 'r+'));
+        var recordLength = calcRecordLength(dbf.fields);
+        var buffer = new Buffer(recordLength);
+        var currentPosition = dbf._headerLength + ((RECNO - 1) * recordLength);
+        
+        await (fs.readAsync(fd, buffer, 0, recordLength, currentPosition));
+        var offset = 0; // IGNORE DELETED
+        offset++;
 
+        for (var j = 0; j < dbf.fields.length; ++j) {
+            var field = dbf.fields[j];
+
+            if (data[field.name]) {
+                var value = data[field.name]
+
+                switch (field.type) {
+                    case 'C': // Text
+                        for (var k = 0; k < field.size; ++k) {
+                            //TEMP testing... treat string as octets, not utf8/ascii
+                            //var byte = k < value.length ? value[k] : 0x20;
+                            var byte = k < value.length ? value.charCodeAt(k) : 0x20;
+                            buffer.writeUInt8(byte, offset++);
+                        }
+                        break;
+
+                    case 'N': // Number
+                        value = value.toString();
+                        value = value.slice(0, field.size);
+                        while (value.length < field.size) value = ' ' + value;
+                        buffer.write(value, offset, field.size, 'utf8');
+                        break;
+
+                    case 'L': // Boolean
+                        buffer.writeUInt8(value ? 0x54/* 'T' */ : 0x46/* 'F' */, offset++);
+                        break;
+
+                    case 'D': // Date
+                        value = value ? moment(value).format('YYYYMMDD') : '        ';
+                        buffer.write(value, offset, 8, 'utf8');
+                        break;
+
+                    case 'I': // Integer
+                        buffer.writeInt32LE(value, offset);
+                        break;
+
+                    default:
+                        throw new Error("Type '" + field.type + "' is not supported");
+                }
+            }
+
+            offset += field.size;
+        }
+
+        await (fs.writeAsync(fd, buffer, 0, recordLength, currentPosition));
+    }
+    finally {
+        // Close the file.
+        if (fd) await (fs.closeAsync(fd));
+    }
+}
 
 
 var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
@@ -351,6 +416,8 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
 
         // Read rows in chunks, until enough rows have been read.
         var rows = [];
+        var recordNumber = 0;
+        
         while (true) {
 
             // Work out how many rows to read in this chunk.
@@ -369,7 +436,8 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
 
             // Parse each row.
             for (var i = 0, offset = 0; i < rowsToRead; ++i) {
-                var row = { _raw: {} };
+                recordNumber++;
+                var row = { _raw: {}, RECNO: recordNumber };
                 var isDeleted = (buffer[offset++] === 0x2a);
                 if (isDeleted) { offset += recordLength - 1; continue; }
 
