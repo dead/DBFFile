@@ -104,7 +104,7 @@ var openDBF = async (path: string): Promise<DBFFile> => {
         var recordLength = buffer.readInt16LE(10);
 
         // Ensure the file version is a supported one.
-        assert(fileVersion === 0x03, `File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
+        // assert(fileVersion === 0x03, `File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
 
         // Parse all field descriptors.
         var fields: Field[] = [];
@@ -412,7 +412,7 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
         var currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
 
         // Create a convenience function for extracting strings from the buffer.
-        var substr = (start, count) => buffer.toString('utf8', start, start + count);
+        var substr = (start, count) => buffer.toString('binary', start, start + count);
 
         // Read rows in chunks, until enough rows have been read.
         var rows = [];
@@ -447,7 +447,7 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
                     var len = field.size, value: any = null;
 
                     // Keep raw buffer data for each field value.
-                    row._raw[field.name] = buffer.slice(offset, offset + field.size);
+                    // row._raw[field.name] = buffer.slice(offset, offset + field.size);
 
                     // Decode the field from the buffer, according to its type.
                     switch (field.type) {
@@ -472,6 +472,10 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
                         case 'I': // Integer
                             value = buffer.readInt32LE(offset);
                             offset += field.size;
+                            break;
+                        case 'M': // Memo
+                            value = buffer[offset] === 0x20 ? null : parseInt(substr(offset, 10))
+                            offset += 10;
                             break;
                         default:
                             throw new Error("Type '" + field.type + "' is not supported");
