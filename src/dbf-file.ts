@@ -416,7 +416,7 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
 
         // Read rows in chunks, until enough rows have been read.
         var rows = [];
-        var recordNumber = 0;
+        var recordNumber = dbf._recordsRead;
         
         while (true) {
 
