@@ -1,5 +1,5 @@
-built/
 node_modules/
+built/test/
 *.js.map
 *.log
 *.sln
