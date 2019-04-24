@@ -409,7 +409,7 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
                             value = 'TtYy'.indexOf(c) >= 0 ? true : ('FfNn'.indexOf(c) >= 0 ? false : (dbf._returnNull ? null : false));
                             break;
                         case 'D': // Date
-                            value = buffer[offset] === 0x20 ? (dbf._returnNull ? null : '0000-00-00') : (dbf._returnDate ? moment(substr(offset, 8), "YYYYMMDD").toDate() : moment(substr(offset, 8), "YYYYMMDD").format("YYYY-MM-DD"));
+                            value = buffer[offset] === 0x20 ? (dbf._returnNull ? null : '0000-00-00') : (dbf._returnDate ? moment.utc(substr(offset, 8), "YYYYMMDD").toDate() : moment(substr(offset, 8), "YYYYMMDD").format("YYYY-MM-DD"));
                             offset += 8;
                             break;
                         case 'I': // Integer
