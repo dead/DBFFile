@@ -99,7 +99,9 @@ var openDBF = async (path: string): Promise<DBFFile> => {
         if (fields.map(f => f.type == 'M').length > 0) {
             var extname = pathNode.extname(path);
             var memoFilePath = path.replace(extname, '.fpt');
-            _memoFile = new MemoFile(memoFilePath);
+            if (fs.existsSync(memoFilePath)) {
+                _memoFile = new MemoFile(memoFilePath);
+            }
         }
 
         // Parse the header terminator.

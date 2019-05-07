@@ -125,7 +125,9 @@ var openDBF = function (path) { return __awaiter(_this, void 0, void 0, function
                 if (fields.map(function (f) { return f.type == 'M'; }).length > 0) {
                     extname = pathNode.extname(path);
                     memoFilePath = path.replace(extname, '.fpt');
-                    _memoFile = new MemoFile(memoFilePath);
+                    if (fs.existsSync(memoFilePath)) {
+                        _memoFile = new MemoFile(memoFilePath);
+                    }
                 }
                 // Parse the header terminator.
                 return [4 /*yield*/, (fs.readAsync(fd, buffer, 0, 1, 32 + fields.length * 32))];
