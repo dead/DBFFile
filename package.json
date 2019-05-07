@@ -36,6 +36,7 @@
     "@types/node": "^7.0.31",
     "bluebird": "^3.3.4",
     "lodash": "^4.6.1",
+    "memo_file": "^1.1.0",
     "moment": "^2.21.0"
   },
   "devDependencies": {

@@ -3,6 +3,8 @@ import * as Bluebird from 'bluebird';
 var fs: any = Bluebird.promisifyAll(require('fs'));
 import * as _ from 'lodash';
 import * as moment from 'moment';
+import * as MemoFile from 'memo_file'
+import * as pathNode from 'path'
 
 // For information about the dBase III file format, see:
 // http://www.dbf2002.com/dbf-file-format.html
@@ -49,6 +51,7 @@ export class DBFFile {
     _ignoreDeleted: boolean;
     _returnNull: boolean;
     _returnDate: boolean;
+    _memoFile: any;
 }
 
 /** Structural typing for DBF field metadata. */
@@ -92,6 +95,13 @@ var openDBF = async (path: string): Promise<DBFFile> => {
             fields.push(field);
         }
 
+        var _memoFile = null;
+        if (fields.map(f => f.type == 'M').length > 0) {
+            var extname = pathNode.extname(path);
+            var memoFilePath = path.replace(extname, '.fpt');
+            _memoFile = new MemoFile(memoFilePath);
+        }
+
         // Parse the header terminator.
         await (fs.readAsync(fd, buffer, 0, 1, 32 + fields.length * 32));
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
@@ -110,6 +120,7 @@ var openDBF = async (path: string): Promise<DBFFile> => {
         result._ignoreDeleted = true;
         result._returnNull = true;
         result._returnDate = true;
+        result._memoFile = _memoFile;
         return result;
     }
     finally {
@@ -409,7 +420,15 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
                             value = 'TtYy'.indexOf(c) >= 0 ? true : ('FfNn'.indexOf(c) >= 0 ? false : (dbf._returnNull ? null : false));
                             break;
                         case 'D': // Date
-                            value = buffer[offset] === 0x20 ? (dbf._returnNull ? null : '0000-00-00') : (dbf._returnDate ? moment(substr(offset, 8), "YYYYMMDD").toDate() : moment(substr(offset, 8), "YYYYMMDD").format("YYYY-MM-DD"));
+                            value = buffer[offset] === 0x20 ? (
+                                dbf._returnNull ? 
+                                    null :
+                                    (dbf._returnDate ? 
+                                        moment("1900-01-01", "YYYYMMDD").toDate() : 
+                                        "1900-01-01")) :
+                                (dbf._returnDate ? 
+                                    moment(substr(offset, 8), "YYYYMMDD").toDate() :
+                                    moment(substr(offset, 8), "YYYYMMDD").format("YYYY-MM-DD"));
                             offset += 8;
                             break;
                         case 'I': // Integer
@@ -417,8 +436,12 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
                             offset += field.size;
                             break;
                         case 'M': // Memo
-                            value = buffer[offset] === 0x20 ? null : parseInt(substr(offset, 10))
-                            offset += 10;
+                            while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
+                            value = len > 0 ? parseFloat(substr(offset, len)) : (dbf._returnNull ? null : 0.0);
+                            offset += len;
+                            if (!isNaN(value) && dbf._memoFile) {
+                                value = dbf._memoFile.getBlockContentAt(value);
+                            }
                             break;
                         default:
                             throw new Error("Type '" + field.type + "' is not supported");

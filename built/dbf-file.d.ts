@@ -21,6 +21,7 @@ export declare class DBFFile {
     _ignoreDeleted: boolean;
     _returnNull: boolean;
     _returnDate: boolean;
+    _memoFile: any;
 }
 /** Structural typing for DBF field metadata. */
 export interface Field {

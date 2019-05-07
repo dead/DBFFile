@@ -41,6 +41,8 @@ var Bluebird = require("bluebird");
 var fs = Bluebird.promisifyAll(require('fs'));
 var _ = require("lodash");
 var moment = require("moment");
+var MemoFile = require("memo_file");
+var pathNode = require("path");
 // For information about the dBase III file format, see:
 // http://www.dbf2002.com/dbf-file-format.html
 // http://www.dbase.com/KnowledgeBase/int/db7_file_fmt.htm
@@ -81,7 +83,7 @@ var DBFFile = /** @class */ (function () {
 exports.DBFFile = DBFFile;
 //-------------------- Private implementation starts here --------------------
 var openDBF = function (path) { return __awaiter(_this, void 0, void 0, function () {
-    var fd, buffer, fileVersion, recordCount, headerLength, recordLength, fields, type, field, result;
+    var fd, buffer, fileVersion, recordCount, headerLength, recordLength, fields, type, field, _memoFile, extname, memoFilePath, result;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
@@ -118,9 +120,15 @@ var openDBF = function (path) { return __awaiter(_this, void 0, void 0, function
                 assert(fields.every(function (f) { return f.name !== field.name; }), "Duplicate field name: '" + field.name + "'");
                 fields.push(field);
                 return [3 /*break*/, 3];
-            case 5: 
-            // Parse the header terminator.
-            return [4 /*yield*/, (fs.readAsync(fd, buffer, 0, 1, 32 + fields.length * 32))];
+            case 5:
+                _memoFile = null;
+                if (fields.map(function (f) { return f.type == 'M'; }).length > 0) {
+                    extname = pathNode.extname(path);
+                    memoFilePath = path.replace(extname, '.fpt');
+                    _memoFile = new MemoFile(memoFilePath);
+                }
+                // Parse the header terminator.
+                return [4 /*yield*/, (fs.readAsync(fd, buffer, 0, 1, 32 + fields.length * 32))];
             case 6:
                 // Parse the header terminator.
                 _a.sent();
@@ -137,6 +145,7 @@ var openDBF = function (path) { return __awaiter(_this, void 0, void 0, function
                 result._ignoreDeleted = true;
                 result._returnNull = true;
                 result._returnDate = true;
+                result._memoFile = _memoFile;
                 return [2 /*return*/, result];
             case 7:
                 if (!fd) return [3 /*break*/, 9];
@@ -474,7 +483,14 @@ var readRecordsFromDBF = function (dbf, maxRows) { return __awaiter(_this, void 
                                 value = 'TtYy'.indexOf(c) >= 0 ? true : ('FfNn'.indexOf(c) >= 0 ? false : (dbf._returnNull ? null : false));
                                 break;
                             case 'D': // Date
-                                value = buffer[offset] === 0x20 ? (dbf._returnNull ? null : '0000-00-00') : (dbf._returnDate ? moment(substr(offset, 8), "YYYYMMDD").toDate() : moment(substr(offset, 8), "YYYYMMDD").format("YYYY-MM-DD"));
+                                value = buffer[offset] === 0x20 ? (dbf._returnNull ?
+                                    null :
+                                    (dbf._returnDate ?
+                                        moment("1900-01-01", "YYYYMMDD").toDate() :
+                                        "1900-01-01")) :
+                                    (dbf._returnDate ?
+                                        moment(substr(offset, 8), "YYYYMMDD").toDate() :
+                                        moment(substr(offset, 8), "YYYYMMDD").format("YYYY-MM-DD"));
                                 offset += 8;
                                 break;
                             case 'I': // Integer
@@ -482,8 +498,13 @@ var readRecordsFromDBF = function (dbf, maxRows) { return __awaiter(_this, void 
                                 offset += field.size;
                                 break;
                             case 'M': // Memo
-                                value = buffer[offset] === 0x20 ? null : parseInt(substr(offset, 10));
-                                offset += 10;
+                                while (len > 0 && buffer[offset] === 0x20)
+                                    ++offset, --len;
+                                value = len > 0 ? parseFloat(substr(offset, len)) : (dbf._returnNull ? null : 0.0);
+                                offset += len;
+                                if (!isNaN(value) && dbf._memoFile) {
+                                    value = dbf._memoFile.getBlockContentAt(value);
+                                }
                                 break;
                             default:
                                 throw new Error("Type '" + field.type + "' is not supported");

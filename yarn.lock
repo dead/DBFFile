@@ -149,6 +149,11 @@ lodash@^4.6.1:
   version "4.17.11"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.11.tgz#b39ea6229ef607ecd89e2c8df12536891cac9b8d"
 
+memo_file@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/memo_file/-/memo_file-1.1.0.tgz#ef528fe2c429d665bc69d6b2188567d4698972af"
+  integrity sha1-71KP4sQp1mW8adayGIVn1GmJcq8=
+
 minimatch@3.0.4, minimatch@^3.0.4:
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/minimatch/-/minimatch-3.0.4.tgz#5166e286457f03306064be5497e8dbb0c3d32083"
