@@ -488,11 +488,11 @@ var readRecordsFromDBF = function (dbf, maxRows) { return __awaiter(_this, void 
                                 value = buffer[offset] === 0x20 ? (dbf._returnNull ?
                                     null :
                                     (dbf._returnDate ?
-                                        moment("1900-01-01", "YYYYMMDD").toDate() :
+                                        moment.utc("1900-01-01", "YYYYMMDD").toDate() :
                                         "1900-01-01")) :
                                     (dbf._returnDate ?
-                                        moment(substr(offset, 8), "YYYYMMDD").toDate() :
-                                        moment(substr(offset, 8), "YYYYMMDD").format("YYYY-MM-DD"));
+                                        moment.utc(substr(offset, 8), "YYYYMMDD").toDate() :
+                                        moment.utc(substr(offset, 8), "YYYYMMDD").format("YYYY-MM-DD"));
                                 offset += 8;
                                 break;
                             case 'I': // Integer
